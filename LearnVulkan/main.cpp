@@ -136,6 +136,10 @@ struct UniformBufferObject {
     alignas(16) glm::mat4 proj;
 };
 
+struct UniformPushConstant
+{
+    glm::vec3 color;
+};
 
 class HelloTriangleApplication {
 public:
@@ -209,6 +213,8 @@ private:
 
     VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
     bool framebufferResized = false;
+
+    const size_t kPushConstantRangeCount = 1;
 
     void initWindow() {
         glfwInit();
@@ -726,6 +732,14 @@ private:
         pipelineLayoutInfo.setLayoutCount = 1;
         pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
+        pipelineLayoutInfo.pushConstantRangeCount = kPushConstantRangeCount;
+        std::vector<VkPushConstantRange> pushConstantRanges;
+        pushConstantRanges.resize(kPushConstantRangeCount);
+        pushConstantRanges[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        pushConstantRanges[0].offset = 0;
+        pushConstantRanges[0].size = sizeof(UniformPushConstant);
+        pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
+        
         if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create pipeline layout!");
         }
@@ -1421,6 +1435,9 @@ private:
             renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());;
             renderPassInfo.pClearValues = clearValues.data();
 
+            UniformPushConstant pushConstantValue;
+            pushConstantValue.color = glm::vec4(1.0, 1.0, 1.0, 1.0);
+            
             vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
                 vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
@@ -1432,6 +1449,7 @@ private:
                 vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
                 vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
+                vkCmdPushConstants(commandBuffers[i], pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pushConstantValue), &pushConstantValue);
 
                 vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
